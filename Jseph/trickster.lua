@@ -515,14 +515,15 @@ end
 
 
 
+
             function setupMeta(meta)
                 meta.name = "trickster"
-                meta.minLevel = 3
-                meta.maxLevel = 3
+                meta.minLevel = 0
+                meta.maxLevel = 0
                 meta.introbackground = ""
                 meta.introheader = ""
                 meta.introdescription = ""
-                meta.path = "C:/Program Files (x86)/Steam/steamapps/common/Hero Realms/Custom Scripts/trickster.lua"
+                meta.path = "C:/Users/jseph/hero-realms-lua-scripts/hero-realms-lua-scripts/Jseph/trickster.lua"
                 meta.features = {
 }
 
