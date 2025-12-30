@@ -57,14 +57,60 @@ function draw_shuffle_counter_def()
     })
 end
 
--- Skill: pay 1 gold to purchase the first card in your reserve
+-- Helper function to create purchase abilities for reserve cards
+local function create_purchase_ability(baseCost, index, slot)
+    local target = selectLoc(loc(currentPid, reservePloc)).take(index).reverse().take(1)
+    local rawCost = const(baseCost).add(getTurnsPlayed(currentPid).negate())
+    local dynamicCost = ifInt(rawCost.gte(const(0)), rawCost, const(0))
+    return createAbility({
+        id = "purchase_reserve_activate_" .. index,
+        trigger = uiTrigger,
+        promptType = showPrompt,
+        layout = createLayout({
+            name = "Purchase Reserve",
+            art = "art/T_Taxation",
+            text = format("{0}<sprite name=\"gold\">, <sprite name=\"expend\">: Move {1} to your hand.\n(-1<sprite name=\"gold\"> per turn)", { dynamicCost, getCardNameStringExpression(target) }),
+        }),
+        effect = addSlotToTarget(slot).apply(target)
+            .seq(moveTarget(currentHandLoc).apply(target)),
+        cost = combineCosts({ expendCost, goldCost(dynamicCost) }),
+        check = selectLoc(loc(currentPid, reservePloc)).count().gte(index)
+    })
+end
+
+-- Skill: pay dynamic gold to purchase one of the first 4 cards in your reserve
 function purchase_first_reserve_skill_def()
-    -- TODO implement this basic proof of concept skill.
+    local slot = createSlot({ id = "purchased_reserve_card_slot", expiresArray = { neverExpiry } })
+    
+    -- Initial layout for the skill itself
+    local firstCard = selectLoc(loc(currentPid, reservePloc)).take(1)
+    local rawCost = const(9).add(getTurnsPlayed(currentPid).negate())
+    local dynamicCost = ifInt(rawCost.gte(const(0)), rawCost, const(0))
+    local mainLayout = createLayout({
+        name = "Purchase Reserve",
+        art = "art/T_Taxation",
+        text = "Acquire reserve card.\nCost: 7 gold + 2 gold per index - 1 gold per turn.",
+    })
+
+    return createSkillDef({
+        id = "purchase_first_reserve_skill",
+        name = "Purchase Reserve",
+        cardTypeLabel = "Skill",
+        types = { skillType },
+        abilities = {
+            create_purchase_ability(9, 1, slot),
+            create_purchase_ability(11, 2, slot),
+            create_purchase_ability(13, 3, slot),
+            create_purchase_ability(15, 4, slot),
+        },
+        layout = mainLayout,
+        layoutPath = "avatars/profit"
+    })
 end
 
 function setupGame(g)
     registerCards(g, {
-		--purchase_first_reserve_skill_def()
+		purchase_first_reserve_skill_def()
 	})
     standardSetup(g, {
         description = "Custom no heroes game",
@@ -75,21 +121,22 @@ function setupGame(g)
         players = {
             {
                 id = plid1,
-                startDraw = 1,
+                startDraw = 5,
                 name = "Player 1",
                 avatar="assassin",
                 health = 50,
                 cards = {
-                    deck = { -- orc deck still in progress
-                        { qty=1, card=dagger_carddef() },
-                        { qty=1, card=gold_carddef() },
+                    deck = {
+                        { qty=10, card=fire_gem_carddef() },
                     },
                     reserve = {
                         { qty = 1, card = wizard_treasure_map_carddef() },
                         { qty = 1, card = ranger_parrot_carddef() },
+                        { qty = 1, card = fire_gem_carddef() },
+                        { qty = 1, card = gold_carddef() },
                     },
                     skills = {
-                        --purchase_first_reserve_skill_def()
+                        purchase_first_reserve_skill_def()
                     },
                     buffs = {
                         drawCardsCountAtTurnEndDef(5),
