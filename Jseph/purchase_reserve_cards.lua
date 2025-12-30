@@ -89,7 +89,7 @@ function purchase_first_reserve_skill_def()
     local mainLayout = createLayout({
         name = "Purchase Reserve",
         art = "art/T_Taxation",
-        text = "Acquire reserve card.\nCost: 7 gold + 2 gold per index - 1 gold per turn.",
+        text = "Acquire reserve card.\nCost: 8 gold + 2 gold per index - 1 gold per turn.",
     })
 
     return createSkillDef({
