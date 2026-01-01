@@ -105,8 +105,21 @@ function purchase_first_reserve_skill_def()
 end
 
 function setupGame(g)
-    registerCards(g, {
-    })
+    --testing flags
+    local add_all_reserve_cards_to_deck = true
+    local all_card_defs = {}
+    local class_list = { "fighter", "wizard", "cleric", "ranger", "thief", 
+        "barbarian", "alchemist", "druid", "necromancer", "bard", "monk" }
+    if add_all_reserve_cards_to_deck then
+        for n, x in pairs(_G) do
+            if type(x) == "function" and string.find(n, "carddef$") then
+                local firstWord = string.split(n, "_")[1]
+                table.insert(all_card_defs, x())
+            end
+        end
+    end
+    table.insert(all_card_defs, purchase_first_reserve_skill_def())
+    registerCards(g, all_card_defs)
 
     standardSetup(g, {
         description = "Knights of  Balance: A Community Game Balancing Effort.",
