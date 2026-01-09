@@ -310,7 +310,7 @@ function setupGame(g)
         p1Hand = { { qty = 5, card = fire_gem_carddef() }}
     end
     standardSetup(g, {
-        description = "Knights of  Balance: A Community Game Balancing Effort.",
+        description = "Purchase Reserve Cards: A balancing effort by Jseph, Userkaffe and Azgalor.",
         playerOrder = { plid1, plid2 },
         ai = ai.CreateKillSwitchAi(createAggressiveAI(),  createHardAi2()),
         timeoutAi = createTimeoutAi(),
