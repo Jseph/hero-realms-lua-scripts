@@ -111,6 +111,7 @@ function keep_cards_in_reserve_buf_def()
         text = "Reserve cards must be purchased."
     })
     local currentReserve = loc(currentPid, reservePloc)
+    local opponentReserve = loc(oppPid, reservePloc)
     local reserveSlot = createSlot({
         id = "reserve_card_slot",
         expiresArray = { neverExpiry },
@@ -134,7 +135,8 @@ function keep_cards_in_reserve_buf_def()
     for _, override in ipairs(cardCostOverrides) do
         applyCostChangeEffect = applyCostChangeEffect.seq(
             addSlotToTarget(createCostChangeSlot(-override[2], { endOfTurnExpiry }))
-                .apply(selectLoc(currentReserve).where(isCardName(override[1])))
+                .apply(selectLoc(currentReserve).union(selectLoc(opponentReserve))
+                .where(isCardName(override[1])))
         )
     end
     
@@ -146,7 +148,7 @@ function keep_cards_in_reserve_buf_def()
             createAbility({
                 id = "add_slot_to_reserve_cards",
                 trigger = startOfTurnTrigger,
-                activations = multipleActivations,
+                activations = singleActivation,
                 effect = addSlotToTarget(reserveSlot).apply(selectLoc(currentReserve))
                     .seq(applyCostChangeEffect)
             }),
@@ -154,29 +156,6 @@ function keep_cards_in_reserve_buf_def()
         cardEffectAbilities = {
             moveBackToReserve,
         }
-    })
-end
-
--- Helper function to create purchase abilities for reserve cards
-local function create_purchase_ability(baseCost, index, slot)
-    local target = selectLoc(loc(currentPid, reservePloc)).take(index).reverse().take(1)
-    local rawCost = const(baseCost).add(getTurnsPlayed(currentPid).negate())
-    local dynamicCost = ifInt(rawCost.gte(const(0)), rawCost, const(0))
-    return createAbility({
-        id = "purchase_reserve_activate_" .. index,
-        trigger = uiTrigger,
-        promptType = showPrompt,
-        layout = createLayout({
-            name = "Purchase Reserve",
-            art = "art/T_Taxation",
-            text = format("{0}<sprite name=\"gold\">, <sprite name=\"expend\">: Acquire {1} to hand.\n(-1<sprite name=\"gold\"> per turn)", { dynamicCost, getCardNameStringExpression(target) }),
-        }),
-        effect = addSlotToTarget(slot).apply(target)
-            .seq(acquireForFreeTarget(CardLocEnum.ExtraReveal).apply(target))
-            .seq(showTextTarget("<size=75%>Acquired reserve card</size>").apply(selectSource()))
-            .seq(moveTarget(CardLocEnum.Hand).apply(selectLoc(loc(currentPid, extraRevealPloc)).take(1))),
-        cost = combineCosts({ expendCost, goldCost(dynamicCost) }),
-        check = selectLoc(loc(currentPid, reservePloc)).count().gte(index)
     })
 end
 
@@ -192,11 +171,7 @@ local function basic_acquire_ability_layout()
     return createLayout({
         name = "Purchase Reserve",
         art = "art/T_Taxation",
-        text = format("<sprite name=\"expend\">: Acquire reserve cards to hand.{0}", 
-            { ifElseString(
-                target.count().eq(const(0)), 
-                "", 
-                format("\nNext card: {0}\n({1} gold)", {getCardNameStringExpression(target), cardCost}))}),
+        text = "<sprite name=\"expend\">: Acquire the next reserve card to hand."
     })
 end
 
@@ -257,7 +232,6 @@ function purchase_first_reserve_skill_def()
     return createSkillDef({
         id = "purchase_first_reserve_skill",
         name = "Purchase Reserve",
-        cardTypeLabel = "Skill",
         types = { skillType },
         abilities = purchaseAbilities,
         layout = mainLayout,
@@ -268,47 +242,10 @@ function purchase_first_reserve_skill_def()
 end
 
 function setupGame(g)
-    local allCardDefs = {}
-    local classList = { "fighter", "wizard", "cleric", "ranger", "thief", 
-        "barbarian", "alchemist", "druid", "necromancer", "bard", "monk" }
-    
-    local function contains(t, val)
-        for _, v in pairs(t) do
-            if v == val then return true end
-        end
-        return false
-    end
+    registerCards(g, {
+        purchase_first_reserve_skill_def(),
+    })
 
-    if addAllClassCardsToDeck then
-        for n, x in pairs(_G) do
-            if type(x) == "function" and string.find(n, "carddef$") then
-                local firstWord = string.match(n, "^([^_]+)_")
-                if contains(classList, firstWord) then
-                    table.insert(allCardDefs, x())
-                end
-            end
-        end
-    end
-    local allToRegister = { purchase_first_reserve_skill_def() }
-    for _, cardDef in ipairs(allCardDefs) do
-        table.insert(allToRegister, cardDef)
-    end
-    registerCards(g, allToRegister)
-    local p1Deck = {}
-    if addAllClassCardsToDeck then
-        for _, cardDef in ipairs(allCardDefs) do
-            table.insert(p1Deck, { qty = 1, card = cardDef })
-        end
-    end
-    local p1Reserve = {}
-    local p1Hand = {}
-    if debugStart then
-        p1Reserve = {
-            { qty = 1, card = wizard_treasure_map_carddef() },
-            { qty = 1, card = ranger_parrot_carddef() },
-        }
-        p1Hand = { { qty = 5, card = fire_gem_carddef() }}
-    end
     standardSetup(g, {
         description = "Purchase Reserve Cards: A balancing effort by Jseph, Userkaffe and Azgalor.",
         playerOrder = { plid1, plid2 },
@@ -318,53 +255,81 @@ function setupGame(g)
         players = {
             {
                 id = plid1,
+                --isAi = true,
                 startDraw = 3,
                 init = {
                     fromEnv = plid1
                 },
                 cards = {
-                    reserve = p1Reserve,
-                    deck = p1Deck,
-                    hand = p1Hand,
+                    reserve = {
+                        --{ qty = 1, card = wizard_treasure_map_carddef() },
+                        --{ qty = 1, card = ranger_parrot_carddef() }
+                    },
+                    deck = {
+                    },
+                    hand = {
+                        --{ qty = 1, card = thief_enchanted_garrote_carddef() },
+                        --{ qty = 1, card = ranger_honed_black_arrow_carddef() },
+                        --{ qty = 2, card = cleric_follower_b_carddef() },
+                        --{ qty = 2, card = cleric_imperial_sailor_carddef() },
+                        --{ qty = 1, card = cleric_brightstar_shield_carddef() },
+                        --{ qty = 1, card = fighter_rallying_flag_carddef() },
+                        --{ qty = 1, card = barbarian_disorienting_headbutt_carddef() },
+                    },
                     discard = {
+                        -- { qty = 2, card = torgen_rocksplitter_carddef() },
+                        -- { qty = 2, card = cleric_follower_b_carddef() },
+                        -- { qty = 1, card = cleric_follower_a_carddef() },
+                        -- { qty = 1, card = cleric_veteran_follower_carddef() },
+                        -- { qty = 1, card = cleric_redeemed_ruinos_carddef() },
                     },
                     skills = {
                         purchase_first_reserve_skill_def(),
+                        --{ qty = 1, card = fighter_helm_of_fury_carddef() },
+                        --{ qty = 1, card = alchemist_spectrum_spectacles_carddef() }
                     },
                     buffs = {
+                        keep_cards_in_reserve_buf_def(),
                         drawCardsCountAtTurnEndDef(5),
                         discardCardsAtTurnStartDef(),
                         fatigueCount(40, 1, "FatigueP1"),
-                        keep_cards_in_reserve_buf_def(),
                     }
                 }
             },
             {
                 id = plid2,
+                --isAi = true,
                 startDraw = 5,
                 init = {
                     fromEnv = plid2
                 },
                 cards = {
                     reserve = {
-                        --{ qty = 1, card = wizard_treasure_map_carddef() }
+                        --{ qty = 1, card = wizard_treasure_map_carddef() },
                         --{ qty = 1, card = ranger_parrot_carddef() }
                     },
                     deck = {
                     },
                     hand = {
-                        --{ qty = 5, card = fire_gem_carddef() },
+                        --{ qty = 1, card = ranger_light_crossbow_carddef() },
+                        --{ qty = 1, card = ranger_honed_black_arrow_carddef() },
+                        --{ qty = 2, card = cleric_follower_b_carddef() },
+                        --{ qty = 2, card = cleric_imperial_sailor_carddef() },
+                        --{ qty = 1, card = cleric_brightstar_shield_carddef() },
+                        --{ qty = 1, card = sway_carddef() },
                     },
                     discard = {
+                        --{ qty = 2, card = cleric_follower_b_carddef() },
                     },
                     skills = {
                         purchase_first_reserve_skill_def(),
+                        --{ qty = 1, card = cleric_shining_breastplate_carddef() },
                     },
                     buffs = {
+                        keep_cards_in_reserve_buf_def(),
                         drawCardsCountAtTurnEndDef(5),
                         discardCardsAtTurnStartDef(),
                         fatigueCount(40, 1, "FatigueP2"),
-                        keep_cards_in_reserve_buf_def(),
                     }
                 }
             },            

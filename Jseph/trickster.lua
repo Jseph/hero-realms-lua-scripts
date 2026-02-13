@@ -24,6 +24,23 @@ Decrease the cost of two random cards in the market by {gold_2} until your next 
 </vlayout>
 ]]
 
+pet_monkey_layout = [[
+<hlayout spacing="0">
+<icon text="{expend}" fontsize="40"/>
+<vlayout forceheight="false" spacing="6">
+    <hlayout spacing="10">
+       <text text="Rearrange the top 3 cards of the market deck" fontsize="20"/>
+    </hlayout>
+    <hlayout spacing="10">
+       <text text="OR" fontsize="20"/>
+    </hlayout>     
+    <hlayout spacing="10">	
+        <text text="Swap a card in the market row with the top card of the market deck" fontsize="20"/>
+    </hlayout>
+</vlayout>
+</hlayout>
+]]
+
 hidden_power_layout = [[
 <vlayout spacing="6">
   <text text="Reveal the top market card.
@@ -72,13 +89,14 @@ local function show_choices_effect()
         choices = {
         {
             effect = gainGoldEffect(s.Minus(s.Const(1), s.getCounter("reshuffle_card_count")))
+                .seq(gainHealthEffect(s.Minus(s.getCounter("reshuffle_card_count"), s.Const(1))))
                 .seq(animateShuffleDeckEffect(currentPid))
                 .seq(shuffleEffect(loc(currentPid, deckPloc)))
                 .seq(drawCardsEffect(selectTargets().count())),
             layout = createLayout({
                 name = "Continue",
                 art = "art/t_prism_rainerpetter",
-                text = format("{0}<sprite name=\"gold\">: Shuffle your deck then draw {1} card(s)", 
+                text = format("{0}<sprite name=\"gold\">: Gain {0}<sprite name=\"health\"> and shuffle your deck then draw {1} card(s)", 
                     {s.Minus(s.getCounter("reshuffle_card_count"), s.Const(1)), 
                      getCounter("reshuffle_card_count")})
             }),
@@ -90,7 +108,7 @@ end
 local function reshuffle_effect()
     return pushTargetedEffect({
         desc = 
-            "Pay X<sprite name=\"gold\"> to put X+1 cards back in your deck, shuffle, and then draw X+1 cards.",
+            "Pay X<sprite name=\"gold\"> to gain X<sprite name=\"health\">, put X+1 cards back in your deck, shuffle, and then draw X+1 cards.",
         min=1,
         max=ifInt(
             selectLoc(loc(currentPid, handPloc)).count()
@@ -110,7 +128,7 @@ local function reshuffle_hand_skill()
             name = "Mulligan",
             art = "art/t_prism_rainerpetter",
             frame = "frames/alchemist_frames/alchemist_item_cardframe",
-            text = "<sprite name=\"expend\">: Pay X<sprite name=\"gold\"> to put X+1 cards back in your deck, shuffle, and then draw X+1 cards."
+            text = "<sprite name=\"expend\">: Pay X<sprite name=\"gold\"> to gain X<sprite name=\"health\"> and put X+1 cards back in your deck, shuffle, and then draw X+1 cards."
         })
 	--[[local effect_chain = ignoreTarget(showTextEffect("Listing functions!"))
 		for name, value in pairs(_G) do
@@ -262,7 +280,7 @@ local function double_or_nothing_card_def()
     })
 end
 
-local function pet_monkey_effect()
+local function pet_monkey_effect_1()
     local kMoveText = "Moving to top of market deck."
     return pushTargetedEffect({
         desc = "Select a card to swap with the top card of the market deck.",
@@ -276,12 +294,56 @@ local function pet_monkey_effect()
         })
 end
 
+local function pet_monkey_effect_2()
+    return moveTarget(currentRevealLoc).apply(selectLoc(tradeDeckLoc).take(3).reverse())
+        .seq(noUndoEffect())
+        .seq(promptSplit({
+            selector = selectLoc(currentRevealLoc),
+            take = const(0), -- number of cards to take for split
+            sort = const(0), -- number of cards to be sorted for ef2
+            minTake = const(3), -- Number of cards for ef1
+            ef1 = moveTarget(tradeDeckLoc), -- effect to be applied to cards left
+            ef2 = ignoreTarget(nullEffect()), -- effect to be applied to sorted cards
+            header = "Pet Monkey", -- prompt header
+            description = "Rearrange the top 3 cards of the market deck.",
+            rightPileDesc = "Rightmost on top.",
+            pile1Name = "Top 3 cards.",
+            pile2Name = "Unused.",
+            eff1Tags = {  },
+            eff2Tags = {  }}))
+end
+
+local function pet_monkey_effect()
+    return pushChoiceEffect({
+        choices = {
+        {
+            effect = pet_monkey_effect_1(),
+            layout = createLayout({
+                name = "Pet Monkey",
+                art = "art/epicart/kong",
+                text = "Swap any card on the market row with the top card of the market deck."
+            }),
+        },
+        {
+            effect = pet_monkey_effect_2(),
+            layout = createLayout({
+                name = "Pet Monkey",
+                art = "art/epicart/kong",
+                text = "Rearrange the top 3 cards of the market deck.",
+                check = selectLoc(tradeDeckLoc).count()
+                    .gte(const(3))
+            }),
+        },
+    }
+    })
+end
+
 local function pet_monkey_card_def()
     local cardLayout = createLayout({
         name = "Pet Monkey",
         art = "art/epicart/kong",
         frame = "frames/alchemist_frames/alchemist_item_cardframe", 
-        text = "<sprite name=\"expend\">: Swap any card on the market row with the top card of the market deck.",
+        xmlText = pet_monkey_layout,
     })
     return createChampionDef({
         id = "pet_monkey_jseph",
@@ -512,6 +574,7 @@ end
 
 function endGame(g) -- more info on this later
 end
+
 
 
 
